@@ -1,0 +1,83 @@
+---
+title: "Guess"
+author: "Julian Ricardo"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+      code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(here)
+library(tidyr)
+library(ggplot2)
+library(scales)
+library(patchwork)
+library(ggbeeswarm)
+library(ggalt)
+
+theme_set(theme_minimal() +
+            theme(panel.grid.minor = element_blank(),
+                  panel.grid.major.x = element_blank()))
+
+source(here::here("R", "load_guess.R"))
+```
+
+#### The Ages
+
+```{r age_dist_gen}
+ag_guess %>% 
+  .[, c("ageG", "ageT")] %>% 
+  pivot_longer(cols = c(ageG, ageT),
+               names_to = "var") %>% 
+  ggplot(aes(x = value, fill = var)) +
+  geom_area(aes(y = ..count..), stat = "bin", bins = 32,
+            alpha = 1/2, position = position_dodge()) +
+  labs(x = "Age",
+       subtitle = paste(comma(length(unique(ag_guess$guess_id))), "guesses for",
+                        comma(length(unique(ag_guess$photo_id))), "photos")) +
+  scale_y_continuous(labels = comma_format(scale = 1e-3, suffix = "k")) +
+  scale_fill_discrete(name = NULL,
+                      labels = c("Guessed", "Actual"))
+```
+
+#### The Ages, a second way
+
+```{r age_scatter}
+ag_guess %>% 
+  .[, c("ageG", "ageT")] %>% 
+  ggplot(aes(x = ageT, y = ageG)) +
+  geom_hex(alpha = 1/1.1) +
+  geom_abline(slope = 1, intercept = 0,
+              color = "grey75", lty = "dashed",
+              size = rel(1.1)) +
+  scale_fill_viridis_c(trans = "sqrt") +
+  theme(panel.grid.major.x = element_line())
+```
+
+#### The Discrepancies in Ages
+
+
+```{r age_discrep_scatter}
+age_discrep_box <- ag_guess %>% 
+  .[, c("ageT", "outG")] %>% 
+  .[, decade := factor(floor(ageT/10)*10)] %>% 
+  ggplot(aes(x = decade, y = outG)) +
+  geom_boxplot(alpha = 1/2) +
+  geom_abline(slope = 0, intercept = 0,
+              color = "red", lty = "dashed",
+              size = rel(1.1)) +
+  theme(panel.grid.major.x = element_line())
+
+age_discrep_hist <- ag_guess %>% 
+  .[, c("ageT", "outG")] %>% 
+  ggplot(aes(x = ageT)) +
+  geom_histogram(bins = 32) +
+  scale_y_sqrt(labels = comma_format(scale = 1e-3, suffix = "k"))
+
+age_discrep_box /
+  age_discrep_hist +
+  plot_layout(heights = c(3, 1))
+```
