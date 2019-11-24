@@ -25,9 +25,13 @@ theme_set(theme_minimal() +
 source(here::here("R", "load_guess.R"))
 ```
 
+AgeGuess.org is a simple on-line game using biological and perceived age as biomarkers to address scientific questions related to aging in humans. The AgeGuess project updates the AgeGuess.org Public Data Set every three months.
+
 #### The Ages
 
-```{r age_dist_gen}
+Our jumping-off point for this exploration is comparing the full sets of guesses and actual ages. The shapes of the colored areas below show general agreement between the two sets of ages, with a couple of quirks worth highlighting:
+
+```{r age_dist_gen, fig.asp=0.309}
 ag_guess %>% 
   .[, c("ageG", "ageT")] %>% 
   pivot_longer(cols = c(ageG, ageT),
@@ -38,14 +42,23 @@ ag_guess %>%
   labs(x = "Age",
        subtitle = paste(comma(length(unique(ag_guess$guess_id))), "guesses for",
                         comma(length(unique(ag_guess$photo_id))), "photos")) +
-  scale_y_continuous(labels = comma_format(scale = 1e-3, suffix = "k")) +
+  scale_x_continuous(name = "Age", breaks = seq(10, 100, 10)) +
+  scale_y_continuous(name = "Guesses",
+                     labels = comma_format(scale = 1e-3, suffix = "k")) +
   scale_fill_discrete(name = NULL,
-                      labels = c("Guessed", "Actual"))
+                      labels = c("Guessed", "Actual")) +
+  theme(legend.position = c(0.75, 0.5),
+        legend.direction = "horizontal")
 ```
 
-#### The Ages, a second way
+- the 20s, where there are more guesses than actual ages
+- the post-mid-30s, where the number of actual ages outpaces guessed ages
 
-```{r age_scatter}
+Taking a second look at the age distributions, both among guesses and actual ages, can deepen our understanding of how they differ. The graph below shows how close the guesses get to the actual age, with a correct guess falling along the grey dotted line.
+
+The results suggest, at a high level at least, that a fairly equal number of guesses fall above and below the actual ages until the latter hit about 45-50 years old, where the guesses are more likely to be underestimates. But it's a bit hard to tell looking along a diagonal.
+
+```{r age_scatter, fig.asp=0.618}
 ag_guess %>% 
   .[, c("ageG", "ageT")] %>% 
   ggplot(aes(x = ageT, y = ageG)) +
@@ -53,6 +66,8 @@ ag_guess %>%
   geom_abline(slope = 1, intercept = 0,
               color = "grey75", lty = "dashed",
               size = rel(1.1)) +
+  scale_x_continuous(name = "Age, guessed", breaks = seq(10, 100, 10)) +
+  scale_y_continuous(name = "Age, actual", breaks = seq(10, 100, 10)) +
   scale_fill_viridis_c(trans = "sqrt") +
   theme(panel.grid.major.x = element_line())
 ```
@@ -64,20 +79,30 @@ ag_guess %>%
 age_discrep_box <- ag_guess %>% 
   .[, c("ageT", "outG")] %>% 
   .[, decade := factor(floor(ageT/10)*10)] %>% 
+  .[, outG_median := median(outG), by = "decade"] %>% 
   ggplot(aes(x = decade, y = outG)) +
-  geom_boxplot(alpha = 1/2) +
-  geom_abline(slope = 0, intercept = 0,
-              color = "red", lty = "dashed",
-              size = rel(1.1)) +
-  theme(panel.grid.major.x = element_line())
+  geom_violin(aes(fill = outG_median),
+              alpha = 1/1.2, color = "grey35",
+              draw_quantiles = c(0.25, 0.5, 0.75)) +
+  scale_fill_gradient2(name = NULL,
+                       high = "blue", mid = "grey85",
+                       guide = "none")
 
 age_discrep_hist <- ag_guess %>% 
   .[, c("ageT", "outG")] %>% 
   ggplot(aes(x = ageT)) +
-  geom_histogram(bins = 32) +
-  scale_y_sqrt(labels = comma_format(scale = 1e-3, suffix = "k"))
+  geom_histogram(bins = 32,
+                 alpha = 1/1.2,
+                 fill = "grey75") +
+  scale_x_continuous(name = "Age", breaks = seq(10, 100, 10)) +
+  scale_y_sqrt(breaks = c(1e3, 1e4, 3e4),
+               labels = comma_format(scale = 1e-3,
+                                     accuracy = 1,
+                                     suffix = "k"))
 
-age_discrep_box /
+( age_discrep_box +
+    theme(axis.text.x = element_blank(),
+          axis.title.x = element_blank()) )/
   age_discrep_hist +
-  plot_layout(heights = c(3, 1))
+  plot_layout(heights = c(5, 1))
 ```
