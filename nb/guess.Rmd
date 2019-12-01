@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(here)
 library(tidyr)
+library(forcats)
 library(ggplot2)
 library(scales)
 library(patchwork)
@@ -70,15 +71,18 @@ ag_guess %>%
               size = rel(1.1)) +
   scale_x_continuous(name = "Age, guessed", breaks = seq(10, 100, 10)) +
   scale_y_continuous(name = "Age, actual", breaks = seq(10, 100, 10)) +
-  scale_fill_continuous_sequential(palette = "Purples",
+  scale_fill_continuous_sequential(name = "Count",
+                                   palette = "Purples",
                                    trans = "log10") +
-  theme(panel.grid.major.x = element_line())
+  theme(panel.grid.major.x = element_line(),
+        legend.position = c(0.875, 0.25))
 ```
 
 #### The Discrepancies in Ages
 
+Based on all guesses, comparing how far off guesses were (or not) with increasing age of the photographed person
 
-```{r age_discrep_scatter}
+```{r age_discrep_violin}
 age_discrep_box <-ag_guess %>% 
   .[, c("ageT", "outG")] %>% 
   .[, decade := factor(floor(ageT/10)*10)] %>% 
@@ -114,4 +118,79 @@ age_discrep_hist <- ag_guess %>%
           axis.title.x = element_blank()) )/
   age_discrep_hist +
   plot_layout(heights = c(5, 1))
+```
+
+Then, looking at the same spread of errors when split by...
+
+- the gender the guesssers
+
+```{r age_discrep_gend}
+ag_guess[unique(ag_gamers[, c("uid", "gender")]),
+                            on = "uid", nomatch = 0] %>% 
+  .[, c("ageT", "outG", "gender")] %>% 
+  .[, gender := fct_recode(gender, "Not specified" = "") %>% 
+      fct_relevel("Not specified", after = Inf)] %>% 
+  .[, decade := factor(floor(ageT/10)*10)] %>% 
+  ggplot(aes(x = decade)) +
+  stat_summary(
+    mapping = aes(y = outG, 
+                  color = gender),
+    fun.ymin = function(z) { quantile(z,0.25) },
+    fun.ymax = function(z) { quantile(z,0.75) },
+    fun.y = median,
+    position = position_dodge(width = 0.5)) +
+  scale_color_discrete_qualitative("Cold") +
+  labs(x = "Age", y = "Error in guess", color = NULL) +
+  theme(legend.position = c(0.25, 0.25),
+        legend.direction = "horizontal")
+```
+
+- their ethnicity
+
+```{r age_discrep_eth}
+ag_guess[unique(ag_gamers[, c("uid", "ethnicity")]),
+                            on = "uid", nomatch = 0] %>% 
+  .[, c("ageT", "outG", "ethnicity")] %>% 
+  .[, ethnicity := fct_recode(ethnicity, "Not specified" = "") %>% 
+      fct_relevel("Not specified", after = Inf)] %>% 
+  .[, decade := factor(floor(ageT/10)*10)] %>% 
+  ggplot(aes(x = decade)) +
+  stat_summary(aes(y = outG, 
+                   color = ethnicity),
+               fun.ymin = function(z) { quantile(z,0.25) },
+               fun.ymax = function(z) { quantile(z,0.75) },
+               fun.y = median,
+               position = position_dodge(width = 0.75)) +
+  scale_color_discrete_qualitative("Harmonic") +
+  guides(color = guide_legend(nrow = 2)) +
+  labs(x = "Age", y = "Error in guess", color = NULL) +
+  theme(legend.position = c(0.25, 0.25),
+        legend.direction = "horizontal")
+```
+
+- and the year they submitted a guess
+
+```{r age_discrep_yr}
+ag_guess %>% 
+  .[, decade := factor(floor(ageT/10)*10)] %>% 
+  .[, guess_yr := year(access)] %>% 
+  ggplot(aes(x = decade)) +
+  stat_summary(aes(y = outG, 
+                   color = guess_yr,
+                   group = guess_yr),
+               fun.ymin = function(z) { quantile(z,0.25) },
+               fun.ymax = function(z) { quantile(z,0.75) },
+               fun.y = median,
+               position = position_dodge(width = 0.9)) +
+  scale_color_continuous_sequential(name = NULL,
+                                    palette = "Purples",
+                                    begin = 0.333) +
+  # Need the line below if adding a title for colorbar
+  guides(color = guide_colourbar(title.position = "top")) +
+  theme(legend.position = c(0.25, 0.25),
+        legend.direction = "horizontal",
+        legend.title.align = 0,
+        legend.text = element_text(angle = -45),
+        legend.text.align = 0) +
+  labs(x = "Age", y = "Error in guess")
 ```
