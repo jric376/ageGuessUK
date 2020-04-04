@@ -55,9 +55,9 @@ ag_guess %>%
 ```
 
 - the 20s, where there are more guesses than actual ages
-- the post-mid-30s, where the number of actual ages outpaces guessed ages
+- everything right of 35, where the number of actual ages outpaces guessed ages
 
-Taking a second look at the age distributions, both among guesses and actual ages, can deepen our understanding of how they differ. The graph below shows how close the guesses get to the actual age, with a correct guess falling along the grey dotted line.
+Taking a second look at the age distributions, both among guesses and actual ages, can deepen our understanding of how they differ. The graph below shows how close the guesses get to the actual age, with a correct guess falling along the dotted line.
 
 The results suggest, at a high level at least, that a fairly equal number of guesses fall above and below the actual ages until the latter hit about 45-50 years old, where the guesses are more likely to be underestimates. But it's a bit hard to tell looking along a diagonal.
 
@@ -67,7 +67,7 @@ ag_guess %>%
   ggplot(aes(x = ageT, y = ageG)) +
   geom_hex(alpha = 1/1.1) +
   geom_abline(slope = 1, intercept = 0,
-              color = "grey75", lty = "dashed",
+              color = "orange", lty = "dashed",
               size = rel(1.1)) +
   scale_x_continuous(name = "Age, guessed", breaks = seq(10, 100, 10)) +
   scale_y_continuous(name = "Age, actual", breaks = seq(10, 100, 10)) +
@@ -80,10 +80,13 @@ ag_guess %>%
 
 #### The Discrepancies in Ages
 
-Based on all guesses, comparing how far off guesses were (or not) with increasing age of the photographed person
+Based on all guesses, how far off were guesses in relation to the age of the photographed person?
+
+- In the 10-50 range where most ages fall, there's a slight downward trend from accurate to underestimated age guesses
+- This trend looks sharper when considering the full age range in the data, albeit with low counts at the extremes
 
 ```{r age_discrep_violin}
-age_discrep_box <-ag_guess %>% 
+age_discrep_box <- ag_guess %>% 
   .[, c("ageT", "outG")] %>% 
   .[, decade := factor(floor(ageT/10)*10)] %>% 
   .[, outG_median := median(outG), by = "decade"] %>% 
@@ -122,14 +125,13 @@ age_discrep_hist <- ag_guess %>%
 
 Then, looking at the same spread of errors when split by...
 
-- the gender the guesssers
+- guessers' genders (nothing jumps out here)
 
 ```{r age_discrep_gend}
 ag_guess[unique(ag_gamers[, c("uid", "gender")]),
                             on = "uid", nomatch = 0] %>% 
   .[, c("ageT", "outG", "gender")] %>% 
-  .[, gender := fct_recode(gender, "Not specified" = "") %>% 
-      fct_relevel("Not specified", after = Inf)] %>% 
+  .[, gender := fct_relevel(gender, "Not specified", after = Inf)] %>% 
   .[, decade := factor(floor(ageT/10)*10)] %>% 
   ggplot(aes(x = decade)) +
   stat_summary(
@@ -138,21 +140,21 @@ ag_guess[unique(ag_gamers[, c("uid", "gender")]),
     fun.ymin = function(z) { quantile(z,0.25) },
     fun.ymax = function(z) { quantile(z,0.75) },
     fun.y = median,
-    position = position_dodge(width = 0.5)) +
+    position = position_dodge(width = 0.618),
+    size = rel(1.05)) +
   scale_color_discrete_qualitative("Cold") +
   labs(x = "Age", y = "Error in guess", color = NULL) +
   theme(legend.position = c(0.25, 0.25),
         legend.direction = "horizontal")
 ```
 
-- their ethnicity
+- their ethnicity (or here, really, though maybe something to tease out among black and white guessers between 30-50)
 
 ```{r age_discrep_eth}
 ag_guess[unique(ag_gamers[, c("uid", "ethnicity")]),
                             on = "uid", nomatch = 0] %>% 
   .[, c("ageT", "outG", "ethnicity")] %>% 
-  .[, ethnicity := fct_recode(ethnicity, "Not specified" = "") %>% 
-      fct_relevel("Not specified", after = Inf)] %>% 
+  .[, ethnicity := fct_relevel(ethnicity, "Not specified", after = Inf)] %>% 
   .[, decade := factor(floor(ageT/10)*10)] %>% 
   ggplot(aes(x = decade)) +
   stat_summary(aes(y = outG, 
@@ -160,15 +162,16 @@ ag_guess[unique(ag_gamers[, c("uid", "ethnicity")]),
                fun.ymin = function(z) { quantile(z,0.25) },
                fun.ymax = function(z) { quantile(z,0.75) },
                fun.y = median,
-               position = position_dodge(width = 0.75)) +
+               position = position_dodge2(width = 0.75)) +
   scale_color_discrete_qualitative("Harmonic") +
   guides(color = guide_legend(nrow = 2)) +
   labs(x = "Age", y = "Error in guess", color = NULL) +
   theme(legend.position = c(0.25, 0.25),
-        legend.direction = "horizontal")
+        legend.direction = "horizontal",
+        axis.text.x = element_text(hjust = 2.5))
 ```
 
-- and the year they submitted a guess
+- and the year they submitted a guess (again, hard to spot trends, but maybe start looking at guessers in the 30s?)
 
 ```{r age_discrep_yr}
 ag_guess %>% 
@@ -191,6 +194,7 @@ ag_guess %>%
         legend.direction = "horizontal",
         legend.title.align = 0,
         legend.text = element_text(angle = -45),
-        legend.text.align = 0) +
+        legend.text.align = 0,
+        axis.text.x = element_text(hjust = 2.5)) +
   labs(x = "Age", y = "Error in guess")
 ```

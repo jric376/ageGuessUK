@@ -1,0 +1,97 @@
+---
+title: "Guess (two)"
+author: "Julian Ricardo"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+      code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(here)
+library(tidyr)
+library(forcats)
+library(ggplot2)
+library(scales)
+library(patchwork)
+library(ggbeeswarm)
+library(ggalt)
+library(colorspace)
+
+theme_set(theme_minimal() +
+            theme(panel.grid.minor = element_blank(),
+                  panel.grid.major.x = element_blank()))
+
+source(here::here("R", "load_guess.R"))
+```
+
+AgeGuess.org is a simple on-line game using biological and perceived age as biomarkers to address scientific questions related to aging in humans. The AgeGuess project updates the AgeGuess.org Public Data Set every three months.
+
+Aim for part two is to compare how guesses do depending on match (or not) b/w gender, ethnicity, birth county, and age between guesser AND photo
+
+```{r}
+mad_calc <- ag_guess_ethn_match %>% 
+  .[, list(.N,
+           mad = mad(outG),
+           median = as.double(median(abs(outG))),
+           mean = mean(abs(outG)),
+           sd = sd(outG)),
+    by = "match_ethnicity"] %>% 
+  .[, cv_mad := mad/median] %>% 
+  .[, cv_mean := sd/mean]
+
+mad_calc2 <- ag_guess_ethn_match %>% 
+  .[, list(.N,
+           mad = mad(outG),
+           median = as.double(median(abs(outG))),
+           mean = mean(abs(outG)),
+           sd = sd(outG)),
+    by = c("match_ethnicity", "ethnicity")] %>% 
+  .[, cv_mad := mad/median] %>% 
+  .[, cv_mean := sd/mean]
+```
+
+
+```{r}
+ag_guess_ethn_match %>% 
+  .[, c("ageT", "outG", "match_ethnicity")] %>% 
+  .[, match_ethnicity := fct_relevel(as.character(match_ethnicity),
+                                     "TRUE", "FALSE")] %>% 
+  .[, decade := factor(floor(ageT/10)*10)] %>% 
+  ggplot(aes(x = decade)) +
+  stat_summary(
+    mapping = aes(y = outG, 
+                  color = match_ethnicity),
+    fun.ymin = function(z) { quantile(z,0.25) },
+    fun.ymax = function(z) { quantile(z,0.75) },
+    fun.y = median,
+    position = position_dodge(width = 0.618),
+    size = rel(1.05)) +
+  scale_color_discrete_qualitative("Cold") +
+  labs(x = "Age", y = "Error in guess", color = NULL) +
+  theme(legend.position = c(0.25, 0.25),
+        legend.direction = "horizontal")
+
+ag_guess_ethn_match %>% 
+  .[, c("ageT", "outG", "ethnicity", "match_ethnicity")] %>% 
+  .[, match_ethnicity := fct_relevel(as.character(match_ethnicity),
+                                     "TRUE", "FALSE")] %>% 
+  .[, ethnicity := fct_infreq(ethnicity) %>% 
+      fct_relevel("Not specified", after = Inf)] %>% 
+  .[, decade := factor(floor(ageT/10)*10)] %>% 
+  ggplot(aes(x = decade)) +
+  stat_summary(
+    mapping = aes(y = outG, 
+                  color = match_ethnicity),
+    fun.ymin = function(z) { quantile(z,0.25) },
+    fun.ymax = function(z) { quantile(z,0.75) },
+    fun.y = median,
+    position = position_dodge(width = 0.618)) +
+  facet_wrap( ~ ethnicity) +
+  scale_color_discrete_qualitative("Cold") +
+  labs(x = "Age", y = "Error in guess", color = NULL) +
+  theme(legend.position = "bottom",
+        legend.direction = "horizontal")
+```
